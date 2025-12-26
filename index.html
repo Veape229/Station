@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Veape: Cyber Slices</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- 引入极具力量感的字体 -->
+    <link href="https://gs.jurieo.com/gemini/fonts-googleapis/css2?family=Antonio:wght@700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --slice-transition: cubic-bezier(0.25, 1, 0.5, 1);
+            --bg-dark: #0a0a0a;
+            --accent-yellow: #fcee0a; /* Cyberpunk Yellow */
+            --accent-cyan: #00f0ff;
+            --accent-red: #ff003c;
+            --accent-purple: #bc13fe;
+            --accent-green: #39ff14;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-dark);
+            font-family: 'Antonio', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            color: white;
+        }
+
+        /* --- 1. 容器 --- */
+        .container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            /* 增加一点内边距，像画框一样 */
+            padding: 0; 
+            background: #000;
+        }
+
+        /* --- 2. 切片核心 --- */
+        .slice {
+            position: relative;
+            flex: 1; /* 默认均分 */
+            height: 100%;
+            transition: flex 0.6s var(--slice-transition), filter 0.4s;
+            overflow: hidden;
+            cursor: pointer;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            filter: grayscale(100%) brightness(0.6); /* 默认黑白且暗淡 */
+        }
+
+        /* 最后一个切片去掉右边框 */
+        .slice:last-child {
+            border-right: none;
+        }
+
+        /* --- 3. 悬停状态 (核心交互) --- */
+        .slice:hover {
+            flex: 8; /* 展开宽度，挤压其他 */
+            filter: grayscale(0%) brightness(1); /* 恢复彩色 */
+        }
+
+        /* 当某个切片被悬停时，其他切片变得更暗 */
+        .container:hover .slice:not(:hover) {
+            filter: grayscale(100%) brightness(0.3);
+        }
+
+        /* --- 4. 背景图层 --- */
+        .slice-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* 稍微放大一点，方便做视差移动 */
+            transform: scale(1.1);
+            transition: transform 6s ease-out;
+            z-index: 0;
+        }
+        
+        .slice:hover .slice-bg {
+            transform: scale(1.0); /* 展开时缓慢缩小 (Ken Burns Effect) */
+        }
+
+        /* 覆盖层：增加渐变，让文字更清晰 */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.6) 100%);
+            z-index: 1;
+        }
+
+        /* 装饰性网格纹理 */
+        .grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* --- 5. 内容层 --- */
+        .content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 3rem;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            /* 即使在大屏上，内容区域也不要太宽 */
+            max-width: 800px;
+            /* 默认内容隐藏或移位 */
+            opacity: 0; 
+            transform: translateY(20px);
+            transition: all 0.4s 0.1s var(--slice-transition);
+        }
+
+        /* 悬停时显示内容 */
+        .slice:hover .content {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 默认显示的垂直标题 (收起状态) */
+        .vertical-label {
+            position: absolute;
+            bottom: 4rem;
+            left: 50%;
+            transform: translateX(-50%);
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            font-size: 1.5rem;
+            letter-spacing: 0.2em;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            white-space: nowrap;
+            z-index: 5;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* 展开时隐藏垂直标题 */
+        .slice:hover .vertical-label {
+            opacity: 0;
+        }
+
+        /* --- 6. 字体排版 --- */
+        .big-title {
+            font-size: 5rem;
+            line-height: 0.9;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            /* 文字描边风格 */
+            -webkit-text-stroke: 0px;
+        }
+        
+        .subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            color: var(--accent-yellow);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .desc-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: #ccc;
+            max-width: 400px;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            display: none; /* 移动端可能需要隐藏 */
+        }
+        @media (min-width: 768px) {
+            .desc-text { display: block; }
+        }
+
+        /* 装饰性编号 */
+        .index-number {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            font-size: 4rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.05);
+            font-family: 'Antonio', sans-serif;
+            z-index: 5;
+            transition: color 0.3s;
+        }
+        .slice:hover .index-number {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- 7. 移动端适配 --- */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .slice {
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .vertical-label {
+                writing-mode: horizontal-tb;
+                bottom: 1rem;
+                left: 2rem;
+                transform: none;
+                font-size: 1rem;
+            }
+            .big-title {
+                font-size: 3rem;
+            }
+            .content {
+                padding: 1.5rem;
+            }
+        }
+        
+        /* 装饰性扫描线 */
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* Glitch 效果 */
+        .glitch-wrapper:hover .big-title {
+            animation: glitch-anim 0.3s infinite;
+        }
+
+        @keyframes glitch-anim {
+            0% { transform: translate(0) }
+            20% { transform: translate(-2px, 2px) }
+            40% { transform: translate(-2px, -2px) }
+            60% { transform: translate(2px, 2px) }
+            80% { transform: translate(2px, -2px) }
+            100% { transform: translate(0) }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="scanlines"></div>
+
+    <div class="container" id="slice-container">
+        <!-- Slices injected by JS -->
+    </div>
+
+    <!-- 底部固定版权信息 -->
+    <div class="fixed bottom-4 right-4 z-50 text-[10px] font-mono text-white/30 pointer-events-none">
+        VEAPE SYSTEM // SLICE_VIEW_V1.0
+    </div>
+
+    <script>
+        // --- 1. 配置数据 (URL) ---
+        // 我们使用 CSS 渐变模拟背景图，确保轻量化。
+        // 你也可以把 gradient 换成 image url。
+        const links = [
+            { 
+                id: "01", 
+                title: "STUDIO", 
+                fullTitle: "Veape Studio",
+                sub: "COMMAND CENTER", 
+                desc: "Centralized management system for teaching resources and scheduling. Maximum efficiency.",
+                icon: "layout-dashboard", 
+                color: "#00f0ff", // Cyan
+                bg: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)",
+                url: "https://veape229.github.io/school/" // TODO: 填入 URL
+            },
+            { 
+                id: "02", 
+                title: "RETHINK", 
+                fullTitle: "Veape Rethink",
+                sub: "NEURAL NETWORK", 
+                desc: "AI-driven reflection engine. Analyze patterns and generate deep insights instantly.",
+                icon: "brain-circuit", 
+                color: "#bc13fe", // Purple
+                bg: "linear-gradient(135deg, #240b36 0%, #c31432 100%)",
+                url: "https://veape229.github.io/REthink/" // TODO: 填入 URL
+            },
+            { 
+                id: "03", 
+                title: "CLASSPAD", 
+                fullTitle: "Class Pad",
+                sub: "LIVE UPLINK", 
+                desc: "Real-time classroom interaction dashboard. Synchronize data streams in milliseconds.",
+                icon: "radio", 
+                color: "#39ff14", // Green
+                bg: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
+                url: "https://veape229.github.io/ClassPad/" // TODO: 填入 URL
+            },
+            { 
+                id: "04", 
+                title: "NOOK", 
+                fullTitle: "Nook Phone",
+                sub: "LIFE OS", 
+                desc: "Personal schedule management and lifestyle integration. Keep your sanity check.",
+                icon: "smartphone", 
+                color: "#fcee0a", // Yellow
+                bg: "linear-gradient(135deg, #F0F2F0 0%, #000C40 100%)",
+                url: "https://veape229.github.io/Nookphone/" // TODO: 填入 URL
+            },
+            { 
+                id: "05", 
+                title: "NEXUS", 
+                fullTitle: "NEXUS",
+                sub: "IDEA REACTOR", 
+                desc: "Infinite inspiration aggregation hub. Where sparks become flames.",
+                icon: "zap", 
+                color: "#ff003c", // Red
+                bg: "linear-gradient(135deg, #f12711 0%, #f5af19 100%)",
+                url: "https://veape229.github.io/NEXUS/" // TODO: 填入 URL
+            }
+        ];
+
+        // --- 2. 渲染逻辑 ---
+        const container = document.getElementById('slice-container');
+
+        links.forEach(link => {
+            const href = link.url || "#";
+            const target = link.url ? "_blank" : "_self";
+            const prevent = !link.url ? "onclick='event.preventDefault()'" : "";
+
+            // 创建切片
+            // 注意：我们使用一个隐藏的 <a> 覆盖在内容上，或者把整个 slice 变成 <a> 
+            // 这里为了结构清晰，把 slice 设为 div，内部包裹内容，通过 js 跳转或包裹 a
+            
+            const sliceHTML = `
+                <a href="${href}" target="${target}" ${prevent} class="slice group relative block text-white no-underline">
+                    
+                    <!-- 背景层 (渐变或图片) -->
+                    <div class="slice-bg" style="background: ${link.bg};"></div>
+                    
+                    <!-- 纹理层 -->
+                    <div class="grid-pattern"></div>
+                    <div class="overlay"></div>
+
+                    <!-- 垂直标题 (默认显示) -->
+                    <div class="vertical-label">
+                        <span style="color: ${link.color}">//</span> ${link.title}
+                    </div>
+
+                    <!-- 巨大编号 -->
+                    <div class="index-number font-mono">${link.id}</div>
+
+                    <!-- 展开后的内容 -->
+                    <div class="content glitch-wrapper">
+                        <div class="subtitle" style="color: ${link.color}">
+                            <i data-lucide="${link.icon}" width="16" height="16"></i>
+                            <span>${link.sub}</span>
+                            <div class="h-px w-10 bg-current opacity-50"></div>
+                        </div>
+                        <h2 class="big-title" style="text-shadow: 0 0 20px ${link.color}40;">
+                            ${link.fullTitle}
+                        </h2>
+                        <p class="desc-text">
+                            ${link.desc}
+                        </p>
+                        <!-- 装饰性按钮 -->
+                        <div class="mt-4 inline-flex items-center gap-2 text-sm font-mono uppercase tracking-widest border border-white/20 px-4 py-2 hover:bg-white hover:text-black transition-colors w-max">
+                            Access System <i data-lucide="arrow-up-right" width="14" height="14"></i>
+                        </div>
+                    </div>
+                </a>
+            `;
+            container.innerHTML += sliceHTML;
+        });
+
+        // 初始化图标
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+
+    </script>
+</body>
+</html>
